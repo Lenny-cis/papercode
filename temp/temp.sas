@@ -143,3 +143,84 @@
 
 	options nominoperator;
 %mend RelativeComplement;
+* 生成业务时间;
+%macro genBusiDate(flag=,out=,date=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+
+	%if %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&date.) %then %error(Required param is empty! &syspbuff);
+	%if not %refExist(&res.) %then %error(RES is illegal!);
+
+	%local tstmt;
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&date.));
+		if &flag. then do;
+			&flag.=(&BIZ_START_DATE. le &date. lt &BIZ_END_DATE.);
+		end;
+		if &flag. then &out.=&date.;
+		else &out.=.;
+	));
+	%let &res.=&tstmt.;
+%mend genBusiDate;
+%macro sasVarsToQuote(vars);
+	%local sw res var qvar i;
+	%let sw=1;
+	%let i=1;
+	%let res=%str();
+	%do %while(&sw);
+		%let var=%qscan(&vars,&i,,QS);
+		%if %isBlank(&var) %then %let sw=0;
+		%else %do;
+			%if &i=1 %then %let res=%str(%')&var%str(%');
+			%else %let res=&res%str(,)%str(%')&var%str(%');
+			%let i=%eval(&i+1);
+		%end;
+	%end;
+	&res.
+%mend sasVarsToQuote;
+%macro base_person(inds=,outds=,baseds=,dropVars=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+
+	%if (not %dsExist(&inds)) or (not %dsExist(&baseds.)) %then %error(INDS or BASEDS doesnot exist! &syspbuff);
+	%if %isBlank(&outds.) %then %let outds=&inds;
+
+	%local dsVars baseVars baseKeyVars baseDataVars;
+
+	%let baseKeyVars=iid;
+	%let baseDataVars=&KEY_PERSON.;
+	%let baseVars=&baseKeyVars. &baseDataVars.;
+	%getDsVarsList(inds=&baseds.,res=&tres.);%let dsVars=&&&tres.;
+	%RelativeComplement(sources=&baseVars.,targets=&dsVars.,res=&tres.);
+	%if not %isBlank(&&&tres.) %then %error(&&&tres. does not in &baseds.);
+
+	%let baseKeyVars=%sasVarsToQuote(&baseKeyVars.);
+	%let baseDataVars=%sasVarsToQuote(&baseDataVars.);
+
+	%local orgcodeStmt getdateStmt istateStmt dropStmt;
+
+	%if not %isBlank(&dropVars.) %then %let dropStmt=%str(%quote(
+		drop &dropVars.;
+	));
+	%genOrgcode(flag=_F_orgcode,sorgcode=sorgcode,out=orgcode,res=&tres.);%let orgcodeStmt=&&&tres.;
+	%genGetdate(flag=_F_getdate,dgetdate=dgetdate,out=getdate,res=&tres.);%let getdateStmt=&&&tres.;
+	%chkIstate(flag=_F_istate,istate=istate,res=&tres.);%let istateStmt=&&&tres.;
+
+	data &outds;
+		if _n_ eq 1 then do;
+			if 0 then set &baseDs.(keep=&baseVars.);
+			declare hash cert(dataset:"&baseDs.(keep=&baseVars.)");
+			cert.definekey(&baseKeyVars.);
+			cert.definedata(&baseDataVars.);
+			cert.definedone();
+		end;
+		set &inds;
+		length orgcode $ &LENGTH_ORGCODE;
+		format 	getDate &FORMAT_DATE;
+		%unquote(&orgcodeStmt.);
+		%unquote(&getdateStmt.);
+		%unquote(&istateStmt.);
+		%unquote(&dropStmt.);
+		if not cert.find(key:ipersonid);
+	run;
+
+%mend;
