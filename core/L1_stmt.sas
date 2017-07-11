@@ -4,7 +4,7 @@
 	%local tstmt;
 
 	%if %isBlank(&scerttype.) or %isBlank(&scertno.) or %isBlank(&flag.) or %isBlank(&out.)
-		%then %error(PARAM is missing!&sysparm.);
+		%then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 
 	%local area ymd chk l;
@@ -65,7 +65,7 @@
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&sorgcode.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&sysparm.);
+	%if %isBlank(&sorgcode.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 
 	%local length;
@@ -91,7 +91,7 @@
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&dgetdate.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&sysparm.);
+	%if %isBlank(&dgetdate.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 
 	%let tstmt=%str(%quote(
@@ -109,7 +109,7 @@
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&istate.) or %isBlank(&flag.) %then %error(PARAM is missing!&sysparm.);
+	%if %isBlank(&istate.) or %isBlank(&flag.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 
 	%let tstmt=%str(%quote(
@@ -120,3 +120,59 @@
 	));
 	%let &res.=&tstmt.;
 %mend chkIstate;
+* 生成业务时间;
+%macro genBusiDate(flag=,outdate=,outmonth=,date=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+
+	%if %isBlank(&flag.) or %isBlank(&outdate.) or %isBlank(&outmonth.) or %isBlank(&date.) %then %error(Required param is empty! &syspbuff);
+	%if not %refExist(&res.) %then %error(RES is illegal!);
+
+	%local tstmt;
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&date.));
+		if &flag. then do;
+			&flag.=(&BIZ_START_DATE. le &date. lt &BIZ_END_DATE.);
+		end;
+		if &flag. then do;
+			&outdate.=&date.;
+			&outmonth.=intnx('dtmonth',&date.,0,'b');
+		end;
+		else do;
+			&outdate.=.;
+			&outmonth.=.;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend genBusiDate;
+* hash过滤语句;
+%macro genhashfilter(ds=,keyVars=,dataVars=,outhash=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+
+	%if (%isBlank(&keyVars.) and %isBlank(&dataVars.)) %then %error(Required param is empty! &syspbuff);
+	%if not %dsExist(&ds.) %then %error(DS does not exist!&syspbuff);
+	%if not (%refExist(&res.) and %refExist(&outhash.)) %then %error(RES or OUTHASH is illegal!);
+
+	%local dsVars baseVars baseKeyVars baseDataVars;
+	%let baseVars=&keyVars. &dataVars.;
+	%getDsVarsList(ds=&ds.,res=&tres.);%let dsVars=&&&tres.;
+	%RelativeComplement(sources=&baseVars.,targets=&dsVars.,res=&tres.);
+	%if not %isBlank(&&&tres.) %then %error(&&&tres. does not in &ds.);
+	%let baseKeyVars=%sasVarsToQuote(&keyVars.);
+	%let baseDataVars=%sasVarsToQuote(&dataVars.);
+
+	%local tstmt keyStmt dataStmt;
+	%let &outhash.=%createTemp(V);
+	%if not %isBlank(&keyVars.) %then %let keyStmt=&&&outhash...definekey(&baseKeyVars.);
+	%if not %isBlank(&dataVars.) %then %let dataStmt=&&&outhash...definedata(&baseDataVars.);
+	%let tstmt=%str(%quote(
+		if _n_ eq 1 then do;
+			if 0 then set &ds.(keep=&baseVars.);
+			declare hash &&&outhash.(dataset:"&ds.(keep=&baseVars.)");
+			%unquote(&keyStmt.);
+			%unquote(&dataStmt.);
+			&&&outhash...definedone();
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend genhashfilter;
