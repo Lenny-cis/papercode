@@ -43,3 +43,7 @@ options dlcreatedir;
 * 人员主键;
 %global KEY_PERSON;
 %let KEY_PERSON=ipersonid;
+
+* 通用名称黑名单;
+%global NAME_BL;
+%let NAME_BL=%str('未知' '暂无' '暂缺' '缺失' '无' '佚名' '空' '空白' 'NULL' '请输入您所在单位的全称' '自动从名片或工牌识别');

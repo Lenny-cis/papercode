@@ -176,3 +176,36 @@
 	));
 	%let &res.=&tstmt.;
 %mend genhashfilter;
+* 生成名字;
+%macro genName(flag=,out=,name=,isCert=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&name.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&name.));
+		if &flag. then do;
+			&flag.=(&name. in(&NAME_BL.));
+		end;
+		if &flag. then &out.=compress(&name.);
+		else &out.='';
+	));
+	%let &res.=&tstmt.;
+%mend genName;
+* 枚举变量;
+%macro genWithFormatEnum(flag=,out=,enum=,format=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+
+	%if %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&enum.) or %isBlank(&format.) %then %error(Required param is empty! &syspbuff);
+	%if not %refExist(&res.) %then %error(RES is illegal!);
+
+	%local tstmt;
+	%formatExist(lib=work,fmt=&format.,isInformat=1,res=&tres.);%if not &&&tres. %then %error(&format. does not exist!);
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&enum.));
+		if &flag. then &out=inputn(upcase(compress(&enum.)),&format.);
+	));
+	%let &res.=&tstmt.;
+%mend genWithFormatEnum;

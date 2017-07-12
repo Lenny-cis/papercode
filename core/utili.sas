@@ -260,3 +260,32 @@
 	run;
 
 %mend flagfilter;
+* 检查格式存在性;
+%macro formatExist(lib=,fmt=,isInformat=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres;
+
+	%local fmtSuffix fmtName fmtType isTempLib;
+
+	%let isTempLib=0;
+	%let fmtSuffix=%str();
+	%let fmtName=%tranwrd(&fmt,%str(.),%str());
+	%let fmtType=FORMAT;
+
+	%if not %refExist(&res) %then %error(RES is invalid! &syspbuff);
+	%let &res=0;
+	%if %isBlank(&fmt) %then %return;
+	%if %isBlank(&isInformat) %then %let isInformat=0;
+	%if %isBlank(&lib) %then %let lib=WORK;
+
+	* 字符/数值检查;
+	%if %subString(&fmt,1,1)=%str($) %then %do;
+		%let fmtSuffix=C;
+		%let fmtName=%subStr(&fmt,2);
+	%end;
+
+	* format/informat检查;
+	%if &isInformat=1 %then %let fmtType=INFMT;
+
+	* formats catalog检查;
+	%if %sysfunc(cexist(&lib..formats.&fmtName..&fmtType.&fmtSuffix.))=1 %then %let &res=1;
+%mend;
