@@ -177,7 +177,7 @@
 	%let &res.=&tstmt.;
 %mend genhashfilter;
 * 生成名字;
-%macro genName(flag=,out=,name=,isCert=,res=);
+%macro genName(flag=,out=,name=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
@@ -209,3 +209,233 @@
 	));
 	%let &res.=&tstmt.;
 %mend genWithFormatEnum;
+* 生成电话号码;
+%macro genMphone(flag=,out=,mphone=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&mphone.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&mphone.));
+		if &flag. then do;
+			&flag.=(length(compress(&mphone.)) ne &LENGTH_MPHONE.);
+			if &flag. then do;
+				&flag.=prxmatch(&REG_MPHONE.,compress(&mphone.));
+			end;
+		end;
+		if &flag. then &out.=prxchange(&REG_MPHONE_DOT,-1,compress(&mphone.));
+		else &out.='';
+	));
+	%let &res.=&tstmt.;
+%mend genMphone;
+* 生成邮编;
+%macro genZip(flag=,out=,var=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=(length(compress(&var.)) ne &LENGTH_ZIP.);
+			if &flag. then do;
+				&flag.=prxmatch(&REG_ZIP.,compress(&var.));
+			end;
+		end;
+		if &flag. then &out.=&var.;
+		else &out.='';
+	));
+	%let &res.=&tstmt.;
+%mend genMphone;
+* 金额类;
+%macro genMoney(flag=,out=,var=,iszero=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt zerostmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&iszero.) %then %let iszero=1;
+
+	%if &iszero. %then %let zerostmt=ge;
+	%else zerostmt=gt;
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=(&var. &zerostmt. 0);
+		end;
+		if &flag. then &out.=&var.;
+		else call missing(&out.);
+	));
+	%let &res.=&tstmt.;
+%mend genMoney;
+* 工作开始时间;
+%macro genStartyear(flag=,out=,var=,cert=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&cert.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.) and not missing(&cert.));
+		if &flag. then do;
+			&flag.=(&JOB_START_YEAR. le &var. le &JOB_END_YEAR.);
+			if &flag. then do;
+				&flag.=((jobstartyear-substr(&cert.,7,4)*1) ge &JOB_START_AGE);
+			end;
+		end;
+		if &flag. then &out.=&var.;
+		else call missing(&out.);
+	));
+	%let &res.=&tstmt.;
+%mend genStartyear;
+* 申请月数;
+%macro genApplymonth(flag=,out=,var=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=(&var. gt 0));
+		end;
+		if &flag. then do;
+			if &var. lt 1 then &out.=&var.;
+			else &out.=round(&var.,1);
+		end;
+		else &out.='';
+	));
+	%let &res.=&tstmt.;
+%mend genApplymonth;
+* 字符转自然数;
+%macro genWithStrint(flag=,out=,var=,iszero=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt zerostmt;
+
+	%local nn;
+	%let nn=%createTemp(V);
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&iszero.) %then %let iszero=1;
+
+	%if &iszero. %then %let zerostmt=ge;
+	%else zerostmt=gt;
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=prxmatch(&REG_NN.,compress(&var.));
+			if &flag. then do;
+				&nn.=input(&var.,best.);
+				&flag.=(&nn. &zerostmt. 0);
+			end;
+		end;
+		if &flag. &out.=&nn.;
+		else call missing(&out.);
+		drop &nn.;
+	));
+	%let &res.=&tstmt.;
+%mend genWithStrPint;
+* 自然数;
+%macro genInt(flag=,out=,var=,iszero=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt zerostmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&iszero.) %then %let iszero=1;
+
+	%if &iszero. %then %let zerostmt=ge;
+	%else zerostmt=gt;
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=not(floor(&var.) lt &var. lt ceil(&var.));
+			if &flag. then do;
+				&flag.=(&var. &zerostmt. 0);
+			end;
+		end;
+		if &flag. &out.=&var.;
+		else call missing(&out.);
+	));
+	%let &res.=&tstmt.;
+%mend genInt;
+* 地区代码;
+%macro genAreacode(flag=,out=,var=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=prxmatch(&REG_AREACODE.,&var.);
+		end;
+		if &flag. then &out.=&var.;
+		else &out.='';
+	));
+	%let &res.=&tstmt.;
+%mend genAreacode;
+* 24月还款状态;
+%macro genPaystat24month(flag=,out=,var=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local isHead MPD c i;
+	%let isHead=%createTemp(V);
+	%let MPD=%createTemp(V);
+	%let c=%createTemp(V);
+	%let i=%createTemp(V);
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&flag.=(length(&var.) eq &LENGTH_PAYSTAT24MONTH.);
+			if &flag. then do;
+				&flag.=prxmatch(&REG_PAYSTAT.,&var.);
+				if &flag. then do;
+					&isHead.=1;
+					&MPD.=0;
+					do &i.=1 to &LENGTH_PAYSTAT24MONTH.;
+						&c.=substr(&var.,&i.,1);
+						select (&c.);
+							when(prxmatch('/[1-7]/')) do;
+								if &isHead. then &MPD.=&c.*1;
+								else do;
+									&MPD.=&MPD.+1;
+									&flag.=(&c.*1 le &MPD.);
+								end;
+								&isHead.=0;
+							end;
+							when('N','*') do;
+								&MPD.=0;
+								&isHead.=0;
+							end;
+							when('.') do;
+								if &MPD. gt 0 then &MPD.=&MPD.+1;
+							end;
+							when('#','C','D','G','Z') do;
+							end;
+							otherwise;
+						end;
+					end;
+				end;
+			end;
+		end;
+		if &flag. then &out.=&var.;
+		else &out.='';
+		drop &isHead. &MPD. &c. &i.;
+	));
+	%let &res.=&tstmt.;
+%mend genPaystat24month;

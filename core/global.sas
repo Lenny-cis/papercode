@@ -47,3 +47,33 @@ options dlcreatedir;
 * 通用名称黑名单;
 %global NAME_BL;
 %let NAME_BL=%str('未知' '暂无' '暂缺' '缺失' '无' '佚名' '空' '空白' 'NULL' '请输入您所在单位的全称' '自动从名片或工牌识别');
+
+* 电话号码;
+%global LENGTH_MPHONE REG_MPHONE REGC_MPHONE_DOT;
+%let LENGTH_MPHONE=11;
+%let REG_MPHONE='/(\d|\*|x|X){11}/';
+%let REGC_MPHONE_DOT='s/(\*|x|X)/./';
+
+* 邮编;
+%global LENGTH_ZIP REG_ZIP;
+%let LENGTH_ZIP=6;
+%let REG_ZIP='/^((0[1-7])|(1([0-3]|[5-6]))|(2[0-7])|(3[0-6])|(4[0-7])|(5[1-7])|(6[1-7])|(7[1-5])|(81)|(9(0|9)))\d{4}$/';
+
+* 职业开始年份 - 允许时间范围;
+%global JOB_START_YAER JOB_END_YAER;
+%let JOB_START_YAER=1960;
+%let JOB_END_YAER=2017;
+%let JOB_START_AGE=14;
+
+* 自然数;
+%global REG_NN;
+%let REG_NN='/^\d+$/';
+
+* 地区代码;
+%global REG_AREACODE;
+%let REG_AREACODE='/^\((1[1-5])|(2[1-3])|(3[1-7])|(4[1-6])|(5[0-4])|(6[1-5])|(71)|(8[1-2]))d{4}$/';
+
+* 还款状态;
+%global LENGTH_PAYSTAT24MONTH REG_PAYSTAT;
+%let LENGTH_PAYSTAT24MONTH=24;
+%let REG_PAYSTAT='/^(#|\.)*(\/|\.)*([1-7]|\*|N|\.)*(C|D|G|Z)?$/';
