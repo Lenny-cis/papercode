@@ -77,3 +77,11 @@ options dlcreatedir;
 %global LENGTH_PAYSTAT24MONTH REG_PAYSTAT;
 %let LENGTH_PAYSTAT24MONTH=24;
 %let REG_PAYSTAT='/^(#|\.)*(\/|\.)*([1-7]|\*|N|\.)*(C|D|G|Z)?$/';
+
+* 超期超过限定时间;
+%global ACCTFINSTAT_EXPIRE_MONTH;
+%let ACCTFINSTAT_EXPIRE_MONTH=12;
+
+* 存续;
+%global SET_ACCTFINSTAT_OPEN;
+%let SET_ACCTFINSTAT_OPEN=10 21 31 41 .;

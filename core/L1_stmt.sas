@@ -1,5 +1,5 @@
 * 生成证件号码;
-%macro genCertId(flag=,out=,scerttype=,scertno=,res=) /parmbuff;
+%macro genChkCertId(flag=,out=,scerttype=,scertno=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
@@ -53,15 +53,15 @@
 				end;
 			end;
 		end;
-		if &flag. then &out.=&scertno.;
-		else &out.='';
+		if &flag.;
+		&out.=&scertno.;
 		drop &area. &ymd. &chk. &l.;
 	));
 	%let &res.=&tstmt.;
-%mend genCertId;
+%mend genChkCertId;
 
 * 生成机构号;
-%macro genOrgcode(flag=,out=,sorgcode=,res=) /parmbuff;
+%macro genChkOrgcode(flag=,out=,sorgcode=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
@@ -80,14 +80,14 @@
 				&flag.=(prxmatch(&REG_ORGCODE.,&sorgcode.));
 			end;
 		end;
-		if &flag. then &out.=&sorgcode.;
-		else &out.='';
+		if &flag.;
+		&out.=&sorgcode.;
 		drop &length.;
 	));
 	%let &res.=&tstmt.;
-%mend;
+%mend genChkOrgcode;
 * 生成数据获取时间;
-%macro genGetdate(flag=,out=,dgetdate=,res=) /parmbuff;
+%macro genChkGetdate(flag=,out=,dgetdate=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
@@ -99,11 +99,11 @@
 		if &flag. then do;
 			&flag.=(&NFCS_START_DATE. le &dgetdate. lt &NFCS_END_DATE.);
 		end;
-		if &flag. then &out.=&dgetdate.;
-		else &out=.;
+		if &flag.;
+		&out.=&dgetdate.;
 	));
 	%let &res.=&tstmt.;
-%mend genGetdate;
+%mend genChkGetdate;
 * 检查istate;
 %macro chkIstate(flag=,istate=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
@@ -117,11 +117,12 @@
 		if &flag. then do;
 			&flag.=(&istate. eq 0);
 		end;
+		if &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend chkIstate;
 * 生成业务时间;
-%macro genBusiDate(flag=,outdate=,outmonth=,date=,res=) /parmbuff;
+%macro genChkBusiDate(flag=,outdate=,outmonth=,date=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 
 	%if %isBlank(&flag.) or %isBlank(&outdate.) or %isBlank(&outmonth.) or %isBlank(&date.) %then %error(Required param is empty! &syspbuff);
@@ -134,17 +135,12 @@
 		if &flag. then do;
 			&flag.=(&BIZ_START_DATE. le &date. lt &BIZ_END_DATE.);
 		end;
-		if &flag. then do;
-			&outdate.=&date.;
-			&outmonth.=intnx('dtmonth',&date.,0,'b');
-		end;
-		else do;
-			&outdate.=.;
-			&outmonth.=.;
-		end;
+		if &flag.;
+		&outdate.=&date.;
+		&outmonth.=intnx('dtmonth',&date.,0,'b');
 	));
 	%let &res.=&tstmt.;
-%mend genBusiDate;
+%mend genChkBusiDate;
 * hash过滤语句;
 %macro genhashfilter(ds=,keyVars=,dataVars=,outhash=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
@@ -439,3 +435,158 @@
 	));
 	%let &res.=&tstmt.;
 %mend genPaystat24month;
+* 比较校验gt;
+%macro chkGt(flag=,large=,small=,iseq=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt iseqstmt;
+
+	%if %isBlank(&large.) or %isBlank(&flag.) or %isBlank(&small.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&iseq.) %then %let iseq=1;
+
+	%if &iseq. %then %let iseqstmt=ge;
+	%else %let iseqstmt=gt;
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&large.) and not missing(&small.));
+		if &flag. then do;
+			&flag.=(&large. &iseqstmt. &small.);
+		end;
+		if &flag.;
+	));
+	%let &res.=&tstmt.;
+
+%mend;
+* 24月还款状态paystate;
+%macro genPaystate(flag=,out=,var=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&paystatemonth.=substr(&var.,24,1);
+		end;
+		&out.=inputn(&paystatemonth.,'spaystat1month');
+		drop &paystatemonth.;
+	));
+	%let &res.=&tstmt.;
+%mend genPaystate;
+* 账户终态_账户状态;
+%macro genFinishstateAccountstat(flag=,out=,var=,dateopened=,dateclosed=,billingdate=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.) and not missing(&dateopened.) and not missing(&dateclosed.) and not missing(&billingdate.));
+		if &flag. then do;
+			if &billingdate. lt &dateopened. then &out=10;
+			else if intck('dtmonth',&billingdate.,&dateclose.,'c') ge 1 then do;
+				if &var. in (1,2,5) then &out.=21;
+				else if &var.=3 then &out.=22;
+				else if &var.=4 then &out.=23;
+			end;
+			else if intck('dtmonth',&billingdate.,&dateclose.,'c') lt 1 then do;
+				if &var.=2 then &out.=31;
+				else if &var. in (1,3,5) then &out.=32;
+				else if &var.=4 then &out.=33;
+			end;
+			if &billingdate. gt &dateclosed. then do;
+				if intck('dtmonth',&dateclosed.,&billingdate.,'c') <= &ACCTFINSTAT_EXPIRE_MONTH then do;
+					if &var. in (1,2) then &out.=41;
+					else if &var.=3 then &out.=42;
+					else if &var.=4 then &out.=43;
+					else if &var.=5 then &out.=49;
+				end;
+				else &out.=49;
+			end;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend;
+* 账户终态_还款状态;
+%macro genFinishstatePaystate(flag=,out=,var=,dateopened=,dateclosed=,billingdate=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.) and not missing(&dateopened.) and not missing(&dateclosed.) and not missing(&billingdate.));
+		if &flag. then do;
+			if &billingdate. lt &dateopened. then &out=10;
+			else if intck('dtmonth',&billingdate.,&dateclose.,'c') ge 1 then do;
+				if &var. in (11,20,21,31,32,33,34,35,36,37) then &out.=21;
+				else if &var.=40 then &out.=22;
+				else if &var.=43 then &out.=23;
+				else if &var. in(41,42) then &out.=29;
+			end;
+			else if intck('dtmonth',&billingdate.,&dateclose.,'c') lt 1 then do;
+				if &var. in(31,32,33,34,35,36,37) then &out.=31;
+				else if &var. in (20,21,40) then &out.=32;
+				else if &var.=43 then &out.=33;
+				else if &var. in (41,42) then &out.=39;
+			end;
+			if &billingdate. gt &dateclosed. then do;
+				if intck('dtmonth',&dateclosed.,&billingdate.,'c') <= &ACCTFINSTAT_EXPIRE_MONTH then do;
+					if &var. in (20,21,31,32,33,34,35,36,37) then &out.=41;
+					else if &var.=40 then &out.=42;
+					else if &var.=43 then &out.=43;
+					else if &var. in (41,42) then &out.=49;
+				end;
+				else &out.=49;
+			end;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend genFinishstatePaystate;
+* 相等判断;
+%macro chkeq(flag=,out=,vara=,varb=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&vara.) or %isBlank(&varb.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&vara.) and not missing(&varb.));
+		if &flag. then do;
+			&flag.=(&vara. eq &varb.);
+		end;
+		if &flag.;
+		&out.=&vara.;
+	));
+	%let &res.=&tstmt.;
+%mend chkeq;
+* 结清时间;
+%macro genFinishdate(flag=,var=,out=,finstate=,billingdate=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&finstate.) or %isBlank(&billingdate.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.) and not missing(&finstate.) and not missing(&billingdate.));
+		if &flag. then do;
+			call missing(&out.);
+			if &finstate. not in(&SET_ACCTFINSTAT_OPEN.) then &out.=&billingdate.;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend;
