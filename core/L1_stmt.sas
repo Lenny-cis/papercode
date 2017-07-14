@@ -590,3 +590,132 @@
 	));
 	%let &res.=&tstmt.;
 %mend;
+* 计算期数，天/周/月/季/半年/年数计算;
+%macro genTermDuration(flag=,out=,varStart=,varEnd=,termsfreq=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local dd dm cm;
+	%let sd=%createTemp(V);
+	%let ed=%createTemp(V);
+	%let cm=%createTemp(V);
+
+	%if %isBlank(&varStart.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&varEnd.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&termsfreq.) %then %let termsfreq=3;
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&varStart.) and not missing(&varEnd.));
+		if &flag. then do;
+			&flag.=(&varEnd. ge &varStart.);
+			if &flag. then do;
+				select(&termsfreq.);
+					when(3,4,5,6) do;
+						&sd.=day(datepart(&varStart.));
+						&ed.=day(datepart(&varEnd.));
+						&cm.=intck("&method.",&varStart.,&varEnd.,'c');
+						if &sd. eq &ed. then &out.=&cm.;
+						else &out.=&cm.+1;
+					end;
+					when(2) do;
+						&sd.=weekday(datepart(&varStart.));
+						&ed.=weekday(datepart(&varEnd.));
+						&cm.=intck('dtweek',&varStart.,&varEnd.,'c');
+						if &sd. eq &ed. then &out.=&cm.;
+						else &out.=&cm.+1;
+					end;
+					when(1) do;
+						&out.=intck('dtday',&varStart.,&varEnd.,'c');
+					end;
+					otherwise call missing(&out.);
+				end;
+			end;
+		end;
+		drop &cm. &sd. &ed.;
+	));
+	%let &res.=&tstmt.;
+%mend genTermDuration;
+* 逾期月数;
+%macro genWithAPDXMonthpastdue(flag=,var=,out=,apd=,apd30=,apd60=,apd90=,apd180=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			if &apd180. gt 0 then &out.=7;
+			else if &apd90. gt 0 then &out.=4;
+			else if &apd60. gt 0 then &out.=3;
+			else if &apd30. gt 0 then &out.=2;
+			else if &apd. gt 0 then &out.=1;
+			else &out.=0;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend;
+%macro genWithPaystateMonthpastdue(flag=,var=,out=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			select(&var.);
+				when(20,21) &out.=0;
+				when(31) &out.=1; 
+				when(32) &out.=2; 
+				when(33) &out.=3; 
+				when(34) &out.=4; 
+				when(35) &out.=5; 
+				when(36) &out.=6; 
+				when(37) &out.=7; 
+				otherwise call missing(&out.);
+			end;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend;
+%macro genWithcurtermPDMPD(flag=,out=,termsfreq=,curtermsPD=,dateclosed=,billingdate=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&curtermsPD.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&dateclosed.) or %isBlank(&billingdate.) or %isBlank(&termsfreq.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%local t_flag t_out t_res;
+	%let t_flag=%createTemp(V);
+	%let t_out=%createTemp(V);
+	%genTermDuration(flag=&t_flag.,out=&t_out.,varStart=&dateclosed.,varEnd=&billingdate.,res=&tres.);%let t_res=&&&tres.;
+
+	%let tstmt=%str(%quote(
+		%unquote(&t_res.);
+		&flag.=(not missing(&curtermsPD.) and not missing(&termsfreq.) and not missing(&dateclosed.) and not missing(&billingdate.));
+		if &flag. then do;
+			select(&termsfreq.);
+				when(1) &out.=&curtermsPD./30.42+&t_out.;
+				when(2) &out.=&curtermsPD./4.33+&t_out.; 
+				when(3) &out.=&curtermsPD.+&t_out.; 
+				when(4) &out.=&curtermsPD.*3+&t_out.; 
+				when(5) &out.=&curtermsPD.*6+&t_out.; 
+				when(6) &out.=&curtermsPD.*12+&t_out.; 
+				otherwise call missing(&out.);
+			end;
+		end;
+	));
+	%let &res.=&tstmt.;
+%mend;
