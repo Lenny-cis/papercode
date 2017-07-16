@@ -1,4 +1,5 @@
 * 创建随机宏变量;
+options minoperator;
 %macro createTemp(type);
 	%if %isBlank(&type.) %then %let type=V;
 	%let type=%upcase(&type.);
@@ -226,6 +227,22 @@
 	%end;
 	&res.
 %mend sasVarsToQuote;
+%macro sasVarsToSql(vars);
+	%local sw res var i;
+	%let sw=1;
+	%let i=1;
+	%let res=%str();
+	%do %while(&sw);
+		%let var=%qscan(&vars,&i,,QS);
+		%if %isBlank(&var) %then %let sw=0;
+		%else %do;
+			%if &i=1 %then %let res=&var;
+			%else %let res=&res%str(,)&var;
+			%let i=%eval(&i+1);
+		%end;
+	%end;
+	&res.
+%mend;
 * flag标识观测删除;
 %macro flagfilter(inds=,outds=,flags=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
@@ -268,17 +285,16 @@
 
 	%let isTempLib=0;
 	%let fmtSuffix=%str();
-	%let fmtName=%tranwrd(&fmt,%str(.),%str());
+	%let fmtName=&fmt;
 	%let fmtType=FORMAT;
 
 	%if not %refExist(&res) %then %error(RES is invalid! &syspbuff);
 	%let &res=0;
 	%if %isBlank(&fmt) %then %return;
 	%if %isBlank(&isInformat) %then %let isInformat=0;
-	%if %isBlank(&lib) %then %let lib=WORK;
 
 	* 字符/数值检查;
-	%if %subString(&fmt,1,1)=%str($) %then %do;
+	%if %subStr(&fmt,1,1)=%str($) %then %do;
 		%let fmtSuffix=C;
 		%let fmtName=%subStr(&fmt,2);
 	%end;

@@ -328,7 +328,7 @@ proc format;
 
 	%let _FN_scondition=7;
 	
-	value residenceCondition
+	value condition
 		1='自置'
 		2='按揭'
 		3='亲属楼宇'
@@ -337,7 +337,7 @@ proc format;
 		6='共有住宅'
 		other='未知';
 
-	%let _FN_residenceCondition=7;
+	%let _FN_condition=7;
 
 	* resCond重分类;
 	invalue resCondToResCondA
@@ -638,7 +638,7 @@ proc format;
 	%let _FN_sreason=8;
 
 	* 信用报告查询原因;
-	value requestreason
+	value reason
 		1='贷款审批'
 		2='贷后管理'
 		3='本人查询'
@@ -665,7 +665,7 @@ proc format;
 	%let _FN_irequesttypeToResult=3;
 
 	* 信用报告查询结果;
-	value requestresult
+	value result
 		1='查得'
 		2='未查得'
 		other='未知';
@@ -691,7 +691,7 @@ proc format;
 	%let _FN_irequesttypeToChannel=5;
 
 	* 信用报告查询渠道;
-	value requestchannel
+	value channel
 		1='在线单笔'
 		2='在线批量'
 		3='直连单笔'
@@ -1688,140 +1688,14 @@ proc format;
 
 	%let _FN_sptn=3;
 	
-	* integer individual(II) to binary;
-	* II2B+value+Informat;
-	invalue II2B1I
-		1=1
-		other=0
-	;
-	invalue II2B2I
-		2=1
-		other=0
-	;
-	invalue II2B3I
-		3=1
-		other=0
-	;
-	invalue II2B4I
-		4=1
-		other=0
-	;
-	invalue II2B5I
-		5=1
-		other=0
-	;
-	invalue II2B6I
-		6=1
-		other=0
-	;
-
-	* float interval(FL) to binary;
-	* IL2B+S+start+E+end+LeftEqual+RightEqual+informat;
-	
-	* (0,1];
-	invalue FL2BS0E1RI
-		0<-1=1
-		other=0
-	;
-	* (0,2];
-	invalue FL2BS0E2RI
-		0<-2=1
-		other=0
-	;
-	* (0,3];
-	invalue FL2BS0E3RI
-		0<-3=1
-		other=0
-	;
-	* (0,4];
-	invalue FL2BS0E4RI
-		0<-4=1
-		other=0
-	;
-	* (0,5];
-	invalue FL2BS0E5RI
-		0<-5=1
-		other=0
-	;
-	* (0,6];
-	invalue FL2BS0E6RI
-		0<-6=1
-		other=0
-	;
-	* (0,+inf);
-	invalue FL2BS0I
-		0<-high=1
-		other=0
-	;
-	* (1,+inf);
-	invalue FL2BS1I
-		1<-high=1
-		other=0
-	;
-	* (2,+inf);
-	invalue FL2BS2I
-		2<-high=1
-		other=0
-	;
-	* (3,+inf);
-	invalue FL2BS3I
-		3<-high=1
-		other=0
-	;
-	* (4,+inf);
-	invalue FL2BS4I
-		4<-high=1
-		other=0
-	;
-	* (5,+inf);
-	invalue FL2BS5I
-		5<-high=1
-		other=0
-	;
-	* (6,+inf);
-	invalue FL2BS6I
-		6<-high=1
-		other=0
-	;
-	* (7,+inf);
-	invalue FL2BS7I
-		7<-high=1
-		other=0
-	;
-	* (24,+inf);
-	invalue FL2BS24I
-		24<-high=1
-		other=0
-	;
-	* (0,1k);
-	invalue FL2BS0E1kI
-		0<-<1000=1
-		other=0
-	;
-	* [1K,2.5k);
-	invalue FL2BS1kE2P5kLI
-		1000-<2500=1
-		other=0
-	;
-	* [2.5k,5k);
-	invalue FL2BS2P5kE5kLI
-		2500-<5000=1
-		other=0
-	;
-	* [5k,10k);
-	invalue FL2BS5kE10kLI
-		5000-<10000=1
-		other=0
-	;
-	* [10k,25k);
-	invalue FL2BS10kE25kLI
-		10000-<25000=1
-		other=0
-	;
-	* [25k,+inf);
-	invalue FL2BS25kLI
-		25000-high=1
-		other=0
+	value termsfreqToInt
+		1='dtday'
+		2='dtweek'
+		3='dtmonth'
+		4='dtqtr'
+		5='dtsemiyear'
+		6='dtyear'
+		other='';
 	;
 quit;
 

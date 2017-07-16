@@ -42,11 +42,15 @@ options dlcreatedir;
 
 * 人员主键;
 %global KEY_PERSON;
-%let KEY_PERSON=ipersonid;
+%let KEY_PERSON=certid;
 
 * 通用名称黑名单;
 %global NAME_BL;
 %let NAME_BL=%str('未知' '暂无' '暂缺' '缺失' '无' '佚名' '空' '空白' 'NULL' '请输入您所在单位的全称' '自动从名片或工牌识别');
+
+* 名字;
+%global LENGTH_NAME;
+%let LENGTH_NAME=60;
 
 * 电话号码;
 %global LENGTH_MPHONE REG_MPHONE REGC_MPHONE_DOT;
@@ -60,9 +64,9 @@ options dlcreatedir;
 %let REG_ZIP='/^((0[1-7])|(1([0-3]|[5-6]))|(2[0-7])|(3[0-6])|(4[0-7])|(5[1-7])|(6[1-7])|(7[1-5])|(81)|(9(0|9)))\d{4}$/';
 
 * 职业开始年份 - 允许时间范围;
-%global JOB_START_YAER JOB_END_YAER;
-%let JOB_START_YAER=1960;
-%let JOB_END_YAER=2017;
+%global JOB_START_YEA JOB_END_YEAR JOB_START_AGE;
+%let JOB_START_YEAR=1960;
+%let JOB_END_YEAR=2017;
 %let JOB_START_AGE=14;
 
 * 自然数;
@@ -85,3 +89,16 @@ options dlcreatedir;
 * 存续;
 %global SET_ACCTFINSTAT_OPEN;
 %let SET_ACCTFINSTAT_OPEN=10 21 31 41 .;
+
+* enum变量长度;
+%global LENGTH_ENUM;
+%let LENGTH_ENUM=3;
+
+* 贷款静态信息;
+%global VARS_LOAN_STATIC;
+%let VARS_LOAN_STATIC=
+	sloantype sareacode
+	ddateopened ddateclosed
+	scurrency icreditlimit iguaranteeway
+	stermsfreq smonthduration streatypaydue
+;

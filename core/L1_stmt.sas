@@ -1,32 +1,32 @@
 * 生成证件号码;
-%macro genChkCertId(flag=,out=,scerttype=,scertno=,res=) /parmbuff;
+%macro genChkCertId(out=,scerttype=,scertno=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&scerttype.) or %isBlank(&scertno.) or %isBlank(&flag.) or %isBlank(&out.)
-		%then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&scerttype.) or %isBlank(&scertno.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 
-	%local area ymd chk l;
+	%local flag area ymd chk l;
 
+	%let flag=%createTemp(V);
 	%let area=%createTemp(V);
 	%let ymd=%createTemp(V);
 	%let chk=%createTemp(V);
 	%let l=%createTemp(V);
 
 	%let tstmt=%str(%quote(
-
+		length &out. $&LENGTH_CERTID.;
 		&flag.=(not missing(&scerttype.));
 		&flag.=(&flag. and (not missing(&scertno.)));
 		if &flag. then do;
 			&flag.=(&scerttype. eq '0');
 			if &flag. then do;
-				&flag.=((length(&scertno.) eq &LENGTH_CERTID.) and prxmatch(&REG_CERTNO.,&scertno.));
+				&flag.=((length(&scertno.) eq &LENGTH_CERTID.) and prxmatch(&REG_CERTNO.,compress(&scertno.)));
 				if &flag. then do;
 					&area.=substr(&scertno.,1,2);
 					&ymd.=substr(&scertno.,7,8);
-					&flag.=prxmatch(&REG_AREA.,&area.);
-					&flag.=(&flag. and prxmatch(&REG_YYYYMMDD.,&ymd.));
+					&flag.=prxmatch(&REG_AREA.,compress(&area.));
+					&flag.=(&flag. and prxmatch(&REG_YYYYMMDD.,compress(&ymd.)));
 					if &flag. then do;
 						&l.=substr(&scertno.,18,1);
 						if upcase(&l.) eq 'X' then &l.=10;
@@ -54,63 +54,96 @@
 			end;
 		end;
 		if &flag.;
-		&out.=&scertno.;
-		drop &area. &ymd. &chk. &l.;
+		&out.=compress(&scertno.);
+		drop &area. &ymd. &chk. &l. &flag. &scerttype. &scertno.;
 	));
 	%let &res.=&tstmt.;
 %mend genChkCertId;
-
-* 生成机构号;
-%macro genChkOrgcode(flag=,out=,sorgcode=,res=) /parmbuff;
+* 证件信息提取;
+%macro genFromCertId(var=,outgender=,outage=,outarea=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&sorgcode.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&outgender.) or %isBlank(&outage.) or %isBlank(&outarea.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%local flag;
+	%let flag=%createTemp(V);
+	%local year;
+	%let year=%substr(%dtvToDs(&DATABASE_DATE.),1,4);
+	%let tstmt=%str(%quote(
+		length &outgender. &LENGTH_ENUM. &outage. 3 &outarea. 3;
+		format &outarea. province. &outgender. gender.;
+		&flag.=(not missing(&var.));
+		if &flag. then do;
+			&outgender.=inputn(substr(&var.,17,1),'certIdToGender');
+			&outage.=&year.-inputn(substr(&var.,7,4),'best');
+			&outarea.=substr(&var.,1,2)*1;
+		end;
+		drop &flag.;
+	));
+	%let &res.=&tstmt.;
+%mend;
+* 生成机构号;
+%macro genChkOrgcode(out=,sorgcode=,res=) /parmbuff;
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&sorgcode.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 
 	%local length;
 	%let length=%createTemp(V);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length  &out. $&LENGTH_ORGCODE.;
 		&flag.=(not missing(&sorgcode.));
 		if &flag. then do;
 			&length.=length(compress(&sorgcode.));
 			&flag.=(&length. eq &LENGTH_ORGCODE.);
 			if &flag. then do;
-				&flag.=(prxmatch(&REG_ORGCODE.,&sorgcode.));
+				&flag.=(prxmatch(&REG_ORGCODE.,compress(&sorgcode.)));
 			end;
 		end;
 		if &flag.;
-		&out.=&sorgcode.;
-		drop &length.;
+		&out.=compress(&sorgcode.);
+		drop &length. &flag. &sorgcode.;
 	));
 	%let &res.=&tstmt.;
 %mend genChkOrgcode;
 * 生成数据获取时间;
-%macro genChkGetdate(flag=,out=,dgetdate=,res=) /parmbuff;
+%macro genChkGetdate(out=,dgetdate=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&dgetdate.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&dgetdate.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		format &out. &FORMAT_DATE.;
 		&flag.=(not missing(&dgetdate.));
 		if &flag. then do;
 			&flag.=(&NFCS_START_DATE. le &dgetdate. lt &NFCS_END_DATE.);
 		end;
 		if &flag.;
 		&out.=&dgetdate.;
+		drop &flag. &dgetdate.;
 	));
 	%let &res.=&tstmt.;
 %mend genChkGetdate;
 * 检查istate;
-%macro chkIstate(flag=,istate=,res=) /parmbuff;
+%macro chkIstate(istate=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&istate.) or %isBlank(&flag.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&istate.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
 		&flag.=(not missing(&istate.));
@@ -118,19 +151,23 @@
 			&flag.=(&istate. eq 0);
 		end;
 		if &flag.;
+		drop &istate. &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend chkIstate;
 * 生成业务时间;
-%macro genChkBusiDate(flag=,outdate=,outmonth=,date=,res=) /parmbuff;
+%macro genChkBusiDate(outdate=,outmonth=,date=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 
-	%if %isBlank(&flag.) or %isBlank(&outdate.) or %isBlank(&outmonth.) or %isBlank(&date.) %then %error(Required param is empty! &syspbuff);
+	%if %isBlank(&outdate.) or %isBlank(&outmonth.) or %isBlank(&date.) %then %error(Required param is empty! &syspbuff);
 	%if not %refExist(&res.) %then %error(RES is illegal!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%local tstmt;
 
 	%let tstmt=%str(%quote(
+		format &outdate. &outmonth. &FORMAT_DATE.;
 		&flag.=(not missing(&date.));
 		if &flag. then do;
 			&flag.=(&BIZ_START_DATE. le &date. lt &BIZ_END_DATE.);
@@ -138,6 +175,7 @@
 		if &flag.;
 		&outdate.=&date.;
 		&outmonth.=intnx('dtmonth',&date.,0,'b');
+		drop &flag. &date.;
 	));
 	%let &res.=&tstmt.;
 %mend genChkBusiDate;
@@ -173,156 +211,188 @@
 	%let &res.=&tstmt.;
 %mend genhashfilter;
 * 生成名字;
-%macro genName(flag=,out=,name=,res=);
+%macro genName(out=,name=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&name.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&name.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. $&LENGTH_NAME.;
 		&flag.=(not missing(&name.));
 		if &flag. then do;
-			&flag.=(&name. in(&NAME_BL.));
+			&flag.=(&name. not in(&NAME_BL.));
 		end;
 		if &flag. then &out.=compress(&name.);
 		else &out.='';
+		drop &flag. &name.;
 	));
 	%let &res.=&tstmt.;
 %mend genName;
 * 枚举变量;
-%macro genWithFormatEnum(flag=,out=,enum=,format=,res=) /parmbuff;
+%macro genWithFormatEnum(out=,enum=,informat=,format=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 
-	%if %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&enum.) or %isBlank(&format.) %then %error(Required param is empty! &syspbuff);
+	%if %isBlank(&out.) or %isBlank(&enum.) or %isBlank(&format.) %then %error(Required param is empty! &syspbuff);
 	%if not %refExist(&res.) %then %error(RES is illegal!);
+	%formatExist(lib=work,fmt=&informat.,isInformat=1,res=&tres.);%if &&&tres. eq 0 %then %error(&informat. does not exist!);
+	%formatExist(lib=work,fmt=&format.,isInformat=0,res=&tres.);%if &&&tres. eq 0 %then %error(&format. does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%local tstmt;
-	%formatExist(lib=work,fmt=&format.,isInformat=1,res=&tres.);%if not &&&tres. %then %error(&format. does not exist!);
 	%let tstmt=%str(%quote(
+		length &out. &LENGTH_ENUM.;
+		format &out. &format..;
 		&flag.=(not missing(&enum.));
-		if &flag. then &out=inputn(upcase(compress(&enum.)),&format.);
+		if &flag. then &out=inputn(compress(&enum.),"&informat.");
+		drop &flag. &enum.;
 	));
 	%let &res.=&tstmt.;
 %mend genWithFormatEnum;
 * 生成电话号码;
-%macro genMphone(flag=,out=,mphone=,res=) /parmbuff;
+%macro genMphone(out=,mphone=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&mphone.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&mphone.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. $&LENGTH_MPHONE.;
 		&flag.=(not missing(&mphone.));
 		if &flag. then do;
-			&flag.=(length(compress(&mphone.)) ne &LENGTH_MPHONE.);
+			&flag.=(length(compress(&mphone.)) eq &LENGTH_MPHONE.);
 			if &flag. then do;
 				&flag.=prxmatch(&REG_MPHONE.,compress(&mphone.));
 			end;
 		end;
-		if &flag. then &out.=prxchange(&REG_MPHONE_DOT,-1,compress(&mphone.));
+		if &flag. then &out.=prxchange(&REGC_MPHONE_DOT.,-1,compress(&mphone.));
 		else &out.='';
+		drop &flag. &mphone.;
 	));
 	%let &res.=&tstmt.;
 %mend genMphone;
 * 生成邮编;
-%macro genZip(flag=,out=,var=,res=) /parmbuff;
+%macro genZip(out=,var=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. $&LENGTH_ZIP.;
 		&flag.=(not missing(&var.));
 		if &flag. then do;
-			&flag.=(length(compress(&var.)) ne &LENGTH_ZIP.);
+			&flag.=(length(compress(&var.)) eq &LENGTH_ZIP.);
 			if &flag. then do;
 				&flag.=prxmatch(&REG_ZIP.,compress(&var.));
 			end;
 		end;
-		if &flag. then &out.=&var.;
+		if &flag. then &out.=compress(&var.);
 		else &out.='';
+		drop &flag. &var.;
 	));
 	%let &res.=&tstmt.;
-%mend genMphone;
+%mend genzip;
 * 金额类;
-%macro genMoney(flag=,out=,var=,iszero=,res=) /parmbuff;
+%macro genMoney(out=,var=,iszero=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt zerostmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 	%if %isBlank(&iszero.) %then %let iszero=1;
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%if &iszero. %then %let zerostmt=ge;
-	%else zerostmt=gt;
+	%else %let zerostmt=gt;
 	%let tstmt=%str(%quote(
+		length &out. 8;
 		&flag.=(not missing(&var.));
 		if &flag. then do;
 			&flag.=(&var. &zerostmt. 0);
 		end;
 		if &flag. then &out.=&var.;
 		else call missing(&out.);
+		drop &flag. &var.;
 	));
 	%let &res.=&tstmt.;
 %mend genMoney;
 * 工作开始时间;
-%macro genStartyear(flag=,out=,var=,cert=,res=) /parmbuff;
+%macro genStartyear(out=,var=,cert=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&cert.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) or %isBlank(&cert.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. 4;
 		&flag.=(not missing(&var.) and not missing(&cert.));
 		if &flag. then do;
 			&flag.=(&JOB_START_YEAR. le &var. le &JOB_END_YEAR.);
 			if &flag. then do;
-				&flag.=((jobstartyear-substr(&cert.,7,4)*1) ge &JOB_START_AGE);
+				&flag.=((&var.-substr(&cert.,7,4)*1) ge &JOB_START_AGE.);
 			end;
 		end;
 		if &flag. then &out.=&var.;
 		else call missing(&out.);
+		drop &flag. &var.;
 	));
 	%let &res.=&tstmt.;
 %mend genStartyear;
 * 申请月数;
-%macro genApplymonth(flag=,out=,var=,res=) /parmbuff;
+%macro genApplymonth(out=,var=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. 8;
 		&flag.=(not missing(&var.));
 		if &flag. then do;
-			&flag.=(&var. gt 0));
+			&flag.=(&var. gt 0);
 		end;
 		if &flag. then do;
 			if &var. lt 1 then &out.=&var.;
 			else &out.=round(&var.,1);
 		end;
-		else &out.='';
+		else call missing(&out.);
+		drop &flag. &var.;
 	));
 	%let &res.=&tstmt.;
 %mend genApplymonth;
 * 字符转自然数;
-%macro genWithStrint(flag=,out=,var=,iszero=,res=);
+%macro genWithStrint(out=,var=,iszero=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt zerostmt;
 
 	%local nn;
 	%let nn=%createTemp(V);
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 	%if %isBlank(&iszero.) %then %let iszero=1;
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%if &iszero. %then %let zerostmt=ge;
-	%else zerostmt=gt;
+	%else %let zerostmt=gt;
 	%let tstmt=%str(%quote(
 		&flag.=(not missing(&var.));
 		if &flag. then do;
@@ -332,23 +402,25 @@
 				&flag.=(&nn. &zerostmt. 0);
 			end;
 		end;
-		if &flag. &out.=&nn.;
+		if &flag. then &out.=&nn.;
 		else call missing(&out.);
-		drop &nn.;
+		drop &flag. &var. &nn.;
 	));
 	%let &res.=&tstmt.;
-%mend genWithStrPint;
+%mend genWithStrint;
 * 自然数;
-%macro genInt(flag=,out=,var=,iszero=,res=);
+%macro genInt(out=,var=,iszero=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt zerostmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 	%if %isBlank(&iszero.) %then %let iszero=1;
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%if &iszero. %then %let zerostmt=ge;
-	%else zerostmt=gt;
+	%else %let zerostmt=gt;
 	%let tstmt=%str(%quote(
 		&flag.=(not missing(&var.));
 		if &flag. then do;
@@ -357,31 +429,35 @@
 				&flag.=(&var. &zerostmt. 0);
 			end;
 		end;
-		if &flag. &out.=&var.;
+		if &flag. then &out.=&var.;
 		else call missing(&out.);
+		drop &flag. &var.;
 	));
 	%let &res.=&tstmt.;
 %mend genInt;
 * 地区代码;
-%macro genAreacode(flag=,out=,var=,res=) /parmbuff;
+%macro genAreacode(out=,var=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
 		&flag.=(not missing(&var.));
 		if &flag. then do;
-			&flag.=prxmatch(&REG_AREACODE.,&var.);
+			&flag.=prxmatch(&REG_AREACODE.,compress(&var.));
 		end;
-		if &flag. then &out.=&var.;
-		else &out.='';
+		if &flag. then &out.=&compress(&var.);
+		else call missing(&out.);
+		drop &flag. &var.;
 	));
 	%let &res.=&tstmt.;
 %mend genAreacode;
 * 24月还款状态;
-%macro genPaystat24month(flag=,out=,var=,res=) /parmbuff;
+%macro genPaystat24month(out=,var=,res=) /parmbuff;
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
@@ -391,22 +467,24 @@
 	%let c=%createTemp(V);
 	%let i=%createTemp(V);
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
 		&flag.=(not missing(&var.));
 		if &flag. then do;
-			&flag.=(length(&var.) eq &LENGTH_PAYSTAT24MONTH.);
+			&flag.=(length(compress(&var.)) eq &LENGTH_PAYSTAT24MONTH.);
 			if &flag. then do;
-				&flag.=prxmatch(&REG_PAYSTAT.,&var.);
+				&flag.=prxmatch(&REG_PAYSTAT.,compress(&var.));
 				if &flag. then do;
 					&isHead.=1;
 					&MPD.=0;
 					do &i.=1 to &LENGTH_PAYSTAT24MONTH.;
-						&c.=substr(&var.,&i.,1);
+						&c.=compress(substr(&var.,&i.,1));
 						select (&c.);
-							when(prxmatch('/[1-7]/')) do;
+							when('1','2','3','4','5','6','7') do;
 								if &isHead. then &MPD.=&c.*1;
 								else do;
 									&MPD.=&MPD.+1;
@@ -429,72 +507,59 @@
 				end;
 			end;
 		end;
-		if &flag. then &out.=&var.;
-		else &out.='';
-		drop &isHead. &MPD. &c. &i.;
+		if &flag.;
+		&out.=compress(&var.);
+		drop &isHead. &MPD. &c. &i. &var. &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend genPaystat24month;
-* 比较校验gt;
-%macro chkGt(flag=,large=,small=,iseq=,res=);
-	%local tres;%let tres=%createTemp(V);%local &tres.;
-	%local tstmt iseqstmt;
-
-	%if %isBlank(&large.) or %isBlank(&flag.) or %isBlank(&small.) %then %error(PARAM is missing!&syspbuff.);
-	%if not %refExist(&res.) %then %error(RES does not exist!);
-	%if %isBlank(&iseq.) %then %let iseq=1;
-
-	%if &iseq. %then %let iseqstmt=ge;
-	%else %let iseqstmt=gt;
-	%let tstmt=%str(%quote(
-		&flag.=(not missing(&large.) and not missing(&small.));
-		if &flag. then do;
-			&flag.=(&large. &iseqstmt. &small.);
-		end;
-		if &flag.;
-	));
-	%let &res.=&tstmt.;
-
-%mend;
 * 24月还款状态paystate;
-%macro genPaystate(flag=,out=,var=,res=);
+%macro genPaystate(out=,var=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
 	%local paystatemonth;
 	%let paystatemonth=%createTemp(V);
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. &LENGTH_ENUM.;
+		format &out. paystat.;
 		&flag.=(not missing(&var.));
 		if &flag. then do;
 			&paystatemonth.=substr(&var.,24,1);
 		end;
 		&out.=inputn(&paystatemonth.,'spaystat1month');
-		drop &paystatemonth.;
+		drop &paystatemonth. &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend genPaystate;
 * 账户终态_账户状态;
-%macro genFinishstateAccountstat(flag=,out=,var=,dateopened=,dateclosed=,billingdate=,res=);
+%macro genFinishstateAccountstat(out=,var=,dateopened=,dateclosed=,billingdate=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. &LENGTH_ENUM.;
+		format &out. acctfinstat.;
 		&flag.=(not missing(&var.) and not missing(&dateopened.) and not missing(&dateclosed.) and not missing(&billingdate.));
 		if &flag. then do;
 			if &billingdate. lt &dateopened. then &out=10;
-			else if intck('dtmonth',&billingdate.,&dateclose.,'c') ge 1 then do;
+			else if intck('dtmonth',&billingdate.,&dateclosed.,'c') ge 1 then do;
 				if &var. in (1,2,5) then &out.=21;
 				else if &var.=3 then &out.=22;
 				else if &var.=4 then &out.=23;
 			end;
-			else if intck('dtmonth',&billingdate.,&dateclose.,'c') lt 1 then do;
+			else if intck('dtmonth',&billingdate.,&dateclosed.,'c') lt 1 then do;
 				if &var.=2 then &out.=31;
 				else if &var. in (1,3,5) then &out.=32;
 				else if &var.=4 then &out.=33;
@@ -509,28 +574,33 @@
 				else &out.=49;
 			end;
 		end;
+		drop &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend;
 * 账户终态_还款状态;
-%macro genFinishstatePaystate(flag=,out=,var=,dateopened=,dateclosed=,billingdate=);
+%macro genFinishstatePaystate(out=,var=,dateopened=,dateclosed=,billingdate=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. &LENGTH_ENUM.;
+		format &out. acctfinstat.;
 		&flag.=(not missing(&var.) and not missing(&dateopened.) and not missing(&dateclosed.) and not missing(&billingdate.));
 		if &flag. then do;
 			if &billingdate. lt &dateopened. then &out=10;
-			else if intck('dtmonth',&billingdate.,&dateclose.,'c') ge 1 then do;
+			else if intck('dtmonth',&billingdate.,&dateclosed.,'c') ge 1 then do;
 				if &var. in (11,20,21,31,32,33,34,35,36,37) then &out.=21;
 				else if &var.=40 then &out.=22;
 				else if &var.=43 then &out.=23;
 				else if &var. in(41,42) then &out.=29;
 			end;
-			else if intck('dtmonth',&billingdate.,&dateclose.,'c') lt 1 then do;
+			else if intck('dtmonth',&billingdate.,&dateclosed.,'c') lt 1 then do;
 				if &var. in(31,32,33,34,35,36,37) then &out.=31;
 				else if &var. in (20,21,40) then &out.=32;
 				else if &var.=43 then &out.=33;
@@ -546,52 +616,36 @@
 				else &out.=49;
 			end;
 		end;
+		drop &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend genFinishstatePaystate;
-* 相等判断;
-%macro chkeq(flag=,out=,vara=,varb=,res=);
-	%local tres;%let tres=%createTemp(V);%local &tres.;
-	%local tstmt;
-
-	%local paystatemonth;
-	%let paystatemonth=%createTemp(V);
-
-	%if %isBlank(&vara.) or %isBlank(&varb.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
-	%if not %refExist(&res.) %then %error(RES does not exist!);
-
-	%let tstmt=%str(%quote(
-		&flag.=(not missing(&vara.) and not missing(&varb.));
-		if &flag. then do;
-			&flag.=(&vara. eq &varb.);
-		end;
-		if &flag.;
-		&out.=&vara.;
-	));
-	%let &res.=&tstmt.;
-%mend chkeq;
 * 结清时间;
-%macro genFinishdate(flag=,var=,out=,finstate=,billingdate=,res=);
+%macro genFinishdate(out=,finstate=,billingdate=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
 	%local paystatemonth;
 	%let paystatemonth=%createTemp(V);
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&finstate.) or %isBlank(&billingdate.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&out.) or %isBlank(&finstate.) or %isBlank(&billingdate.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
-		&flag.=(not missing(&var.) and not missing(&finstate.) and not missing(&billingdate.));
+		format &out. &FORMAT_DATE.;
+		&flag.=(not missing(&finstate.) and not missing(&billingdate.));
 		if &flag. then do;
 			call missing(&out.);
 			if &finstate. not in(&SET_ACCTFINSTAT_OPEN.) then &out.=&billingdate.;
 		end;
+		drop &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend;
 * 计算期数，天/周/月/季/半年/年数计算;
-%macro genTermDuration(flag=,out=,varStart=,varEnd=,termsfreq=,res=);
+%macro genTermDuration(out=,varStart=,varEnd=,termsfreq=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
@@ -600,54 +654,61 @@
 	%let ed=%createTemp(V);
 	%let cm=%createTemp(V);
 
-	%if %isBlank(&varStart.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&varEnd.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&varStart.) or %isBlank(&out.) or %isBlank(&varEnd.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
 	%if %isBlank(&termsfreq.) %then %let termsfreq=3;
+	%local flag;
+	%let flag=%createTemp(V);
+	%local method;
+	%let method=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. 8 &method. $10;
 		&flag.=(not missing(&varStart.) and not missing(&varEnd.));
 		if &flag. then do;
 			&flag.=(&varEnd. ge &varStart.);
 			if &flag. then do;
 				select(&termsfreq.);
-					when(3,4,5,6) do;
+					when(1,3,4,5,6) do;
 						&sd.=day(datepart(&varStart.));
 						&ed.=day(datepart(&varEnd.));
-						&cm.=intck("&method.",&varStart.,&varEnd.,'c');
+						&method.=putn(&termsfreq,'termsfreqToInt');
+						&cm.=intck(&method.,&varStart.,&varEnd.,'c');
 						if &sd. eq &ed. then &out.=&cm.;
 						else &out.=&cm.+1;
 					end;
 					when(2) do;
 						&sd.=weekday(datepart(&varStart.));
 						&ed.=weekday(datepart(&varEnd.));
-						&cm.=intck('dtweek',&varStart.,&varEnd.,'c');
+						&method.=putn(&termsfreq,'termsfreqToInt');
+						&cm.=intck(&method.,&varStart.,&varEnd.,'c');
 						if &sd. eq &ed. then &out.=&cm.;
 						else &out.=&cm.+1;
-					end;
-					when(1) do;
-						&out.=intck('dtday',&varStart.,&varEnd.,'c');
 					end;
 					otherwise call missing(&out.);
 				end;
 			end;
 		end;
-		drop &cm. &sd. &ed.;
+		drop &cm. &sd. &ed. &method. &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend genTermDuration;
 * 逾期月数;
-%macro genWithAPDXMonthpastdue(flag=,var=,out=,apd=,apd30=,apd60=,apd90=,apd180=,res=);
+%macro genWithAPDXMPD(out=,apd=,apd30=,apd60=,apd90=,apd180=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
 	%local paystatemonth;
 	%let paystatemonth=%createTemp(V);
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
-		&flag.=(not missing(&var.));
+		length &out. 8;
+		&flag.=1;
 		if &flag. then do;
 			if &apd180. gt 0 then &out.=7;
 			else if &apd90. gt 0 then &out.=4;
@@ -656,20 +717,24 @@
 			else if &apd. gt 0 then &out.=1;
 			else &out.=0;
 		end;
+		drop &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend;
-%macro genWithPaystateMonthpastdue(flag=,var=,out=,res=);
+%macro genWithPaystateMPD(var=,out=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
 	%local paystatemonth;
 	%let paystatemonth=%createTemp(V);
 
-	%if %isBlank(&var.) or %isBlank(&flag.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&var.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
 	%let tstmt=%str(%quote(
+		length &out. 8;
 		&flag.=(not missing(&var.));
 		if &flag. then do;
 			select(&var.);
@@ -684,38 +749,145 @@
 				otherwise call missing(&out.);
 			end;
 		end;
+		drop &flag.;
 	));
 	%let &res.=&tstmt.;
 %mend;
-%macro genWithcurtermPDMPD(flag=,out=,termsfreq=,curtermsPD=,dateclosed=,billingdate=,res=);
+%macro genWithcurtermPDMPD(out=,termsfreq=,curtermsPD=,dateclosed=,billingdate=,res=);
 	%local tres;%let tres=%createTemp(V);%local &tres.;
 	%local tstmt;
 
 	%local paystatemonth;
 	%let paystatemonth=%createTemp(V);
 
-	%if %isBlank(&curtermsPD.) or %isBlank(&flag.) or %isBlank(&out.) or %isBlank(&dateclosed.) or %isBlank(&billingdate.) or %isBlank(&termsfreq.) %then %error(PARAM is missing!&syspbuff.);
+	%if %isBlank(&curtermsPD.) or %isBlank(&out.) or %isBlank(&dateclosed.) or %isBlank(&billingdate.) or %isBlank(&termsfreq.) %then %error(PARAM is missing!&syspbuff.);
 	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%local flag;
+	%let flag=%createTemp(V);
 
-	%local t_flag t_out t_res;
-	%let t_flag=%createTemp(V);
+	%local t_out t_res;
 	%let t_out=%createTemp(V);
-	%genTermDuration(flag=&t_flag.,out=&t_out.,varStart=&dateclosed.,varEnd=&billingdate.,res=&tres.);%let t_res=&&&tres.;
+	%genTermDuration(out=&t_out.,varStart=&dateclosed.,varEnd=&billingdate.,res=&tres.);%let t_res=&&&tres.;
 
 	%let tstmt=%str(%quote(
+		length &out. 8;
 		%unquote(&t_res.);
 		&flag.=(not missing(&curtermsPD.) and not missing(&termsfreq.) and not missing(&dateclosed.) and not missing(&billingdate.));
 		if &flag. then do;
 			select(&termsfreq.);
-				when(1) &out.=&curtermsPD./30.42+&t_out.;
-				when(2) &out.=&curtermsPD./4.33+&t_out.; 
-				when(3) &out.=&curtermsPD.+&t_out.; 
-				when(4) &out.=&curtermsPD.*3+&t_out.; 
-				when(5) &out.=&curtermsPD.*6+&t_out.; 
-				when(6) &out.=&curtermsPD.*12+&t_out.; 
+				when(1) &out.=sum(&curtermsPD./30.42,&t_out.);
+				when(2) &out.=sum(&curtermsPD./4.33,&t_out.); 
+				when(3) &out.=sum(&curtermsPD.,&t_out.); 
+				when(4) &out.=sum(&curtermsPD.*3,&t_out.); 
+				when(5) &out.=sum(&curtermsPD.*6,&t_out.); 
+				when(6) &out.=sum(&curtermsPD.*12,&t_out.); 
 				otherwise call missing(&out.);
 			end;
 		end;
+		drop &flag. &t_out.;
+	));
+	%let &res.=&tstmt.;
+%mend;
+* 相等判断;
+%macro chkeq(vara=,varb=,res=,method=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%local paystatemonth;
+	%let paystatemonth=%createTemp(V);
+
+	%if %isBlank(&vara.) or %isBlank(&varb.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&method.) %then %let method=DELETE;
+	%else %let method=%upcase(&method.);
+
+	%local methodstmt;
+	%if &method. eq DELETE %then %let methodstmt=%str(%quote(delete;));
+	%else %if &method. eq MISSA %then %let methodstmt=%str(%quote(call missing(&vara.);));
+	%else %if &method. eq MISSB %then %let methodstmt=%str(%quote(call missing(&varb.);));
+	%else %if &method. eq MISSALL %then %let methodstmt=%str(%quote(call missing(&vara.);call missing(&varb.);));
+	%else %error(METHOD is illegal!);
+
+	%local flag;
+	%let flag=%createTemp(V);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&vara.) and not missing(&varb.));
+		if &flag. then do;
+			&flag.=(&vara. eq &varb.);
+		end;
+		if not &flag. then do;
+			%unquote(&methodstmt.);
+		end;
+		drop &flag.;
+	));
+	%let &res.=&tstmt.;
+%mend chkeq;
+* 比较校验gt;
+%macro chkGt(large=,small=,iseq=,res=,method=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt iseqstmt;
+
+	%if %isBlank(&large.) or %isBlank(&small.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+	%if %isBlank(&iseq.) %then %let iseq=1;
+	%if %isBlank(&method.) %then %let method=DELETE;
+	%else %let method=%upcase(&method.);
+
+	%local flag;
+	%let flag=%createTemp(V);
+
+	%local methodstmt;
+	%if &method. eq DELETE %then %let methodstmt=%str(%quote(delete;));
+	%else %if &method. eq MISSLARGE %then %let methodstmt=%str(%quote(call missing(&large.);));
+	%else %if &method. eq MISSSMALL %then %let methodstmt=%str(%quote(call missing(&small.);));
+	%else %if &method. eq MISSALL %then %let methodstmt=%str(%quote(call missing(&large.);call missing(&small.);));
+	%else %error(METHOD is illegal!);
+
+	%if &iseq. %then %let iseqstmt=ge;
+	%else %let iseqstmt=gt;
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&large.) and not missing(&small.));
+		if &flag. then do;
+			&flag.=(&large. &iseqstmt. &small.);
+		end;
+		if not &flag. then do;
+			%unquote(&methodstmt.);
+		end;
+		drop &flag.;
+	));
+	%let &res.=&tstmt.;
+%mend;
+* 缺失检查;
+%macro chkMissing(var=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt iseqstmt;
+
+	%if %isBlank(&var.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%local flag;
+	%let flag=%createTemp(V);
+
+	%let tstmt=%str(%quote(
+		&flag.=(not missing(&var.));
+		if &flag.;
+		drop &flag.;
+	));
+	%let &res.=&tstmt.;
+%mend;
+* 取最大;
+%macro genMax(vars=,out=,res=);
+	%local tres;%let tres=%createTemp(V);%local &tres.;
+	%local tstmt;
+
+	%if %isBlank(&vars.) or %isBlank(&out.) %then %error(PARAM is missing!&syspbuff.);
+	%if not %refExist(&res.) %then %error(RES does not exist!);
+
+	%local sqlvars;
+	%let sqlvars=%sasVarsToSql(&vars.);
+	%let tstmt=%str(%quote(
+		&out.=max(&sqlvars.);
 	));
 	%let &res.=&tstmt.;
 %mend;

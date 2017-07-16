@@ -1,8 +1,13 @@
+libname L0 "&Ltest_PATH.";
+libname L1 "&L1_PATH.";
 %base_certification(inds=L0.sino_person_certification,outds=L1.certification);
 %base_org(inds=L0.sino_org,outds=L1.org);
 %base_person(inds=L0.sino_person,outds=L1.person,baseCertds=L1.certification);
 %base_person(inds=L0.sino_person_address,outds=L1.address,baseCertds=L1.certification);
 %base_person(inds=L0.sino_person_employment,outds=L1.employment,baseCertds=L1.certification);
 %base_loanApply(inds=L0.sino_loan_apply,outds=L1.apply,baseCertds=L1.certification);
-%base_loan(inds=L0.sino_loan,outds=L1.loan,baseCertds=L1.certification);
+%loanStatic(inds=l0.sino_loan,outds=L1.loan);
+%base_loan(inds=L1.loan,outds=L1.loan,baseCertds=L1.certification);
 %base_creditRecord(inds=L0.sino_credit_record,outds=L1.record,baseOrgds=L1.org,baseCertds=L1.certification);
+%removeDupData(inds=l1.loan,outds=l1.loan,keyVars=iloanid billingmonth,sortVars=getdate);
+%removeDupData(inds=l1.apply,outds=l1.apply,keyVars=certid orgcode sapplycode,sortVars=applystate getdate);
